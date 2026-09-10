@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Inventory{% endblock %}
+{% block content %}
+<h1>Inventory</h1>
+
+<div class="card">
+  <h2>Purchase a Phone into Stock</h2>
+  <form id="phone-form">
+    <div class="form-row">
+      <div>
+        <label>Brand</label>
+        <input type="text" id="p-brand" placeholder="Samsung, Apple, Xiaomi..." required>
+      </div>
+      <div>
+        <label>Model</label>
+        <input type="text" id="p-model" placeholder="Galaxy S24, iPhone 15..." required>
+      </div>
+    </div>
+    <div class="form-row">
+      <div>
+        <label>IMEI Number</label>
+        <input type="text" id="p-imei" placeholder="15-digit IMEI" required>
+      </div>
+      <div>
+        <label>Condition</label>
+        <select id="p-condition">
+          <option value="NEW">New</option>
+          <option value="USED">Used / Refurbished</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div>
+        <label>Purchase Price (cost to shop)</label>
+        <input type="number" step="0.01" id="p-purchase_price" required>
+      </div>
+      <div>
+        <label>Selling Price (to customer)</label>
+        <input type="number" step="0.01" id="p-selling_price" required>
+      </div>
+    </div>
+    <div class="form-row">
+      <div>
+        <label>Purchase Date</label>
+        <input type="date" id="p-purchase_date" required>
+      </div>
+      <div>
+        <label>Supplier Name (optional)</label>
+        <input type="text" id="p-supplier_name" placeholder="Leave blank if none">
+      </div>
+    </div>
+    <button type="submit">Add to Stock</button>
+  </form>
+</div>
+
+<div class="card">
+  <div class="toolbar">
+    <h2 style="margin:0">All Phones</h2>
+    <div style="display:flex; gap:10px;">
+      <select id="filter-status">
+        <option value="">All statuses</option>
+        <option value="AVAILABLE">Available</option>
+        <option value="ON_LOAN">On Loan</option>
+        <option value="SOLD">Sold</option>
+      </select>
+      <input type="search" id="search-box" placeholder="Search brand, model, IMEI...">
+    </div>
+  </div>
+  <table>
+    <thead>
+      <tr><th>Brand / Model</th><th>IMEI</th><th>Condition</th><th>Cost</th><th>Selling Price</th><th>Status</th></tr>
+    </thead>
+    <tbody id="phones-body"><tr><td colspan="6">Loading...</td></tr></tbody>
+  </table>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'frontend/js/api.js' %}"></script>
+<script>
+const statusBadge = {
+  AVAILABLE: 'badge-green',
+  ON_LOAN: 'badge-yellow',
+  SOLD: 'badge-gray',
+  RETURNED: 'badge-red',
+};
+
+async function loadPhones() {
+  const tbody = document.getElementById('phones-body');
+  const status = document.getElementById('filter-status').value;
+  const search = document.getElementById('search-box').value;
+  const params = new URLSearchParams();
+  if (status) params.set('stock_status', status);
+  if (search) params.set('search', search);
+
+  try {
+    const data = await API.get(`/inventory/phones/?${params.toString()}`);
+    const rows = data.results || [];
+    tbody.innerHTML = rows.length ? rows.map(p => `
+      <tr>
+        <td>${escapeHtml(p.brand)} ${escapeHtml(p.model_name)}</td>
+        <td>${escapeHtml(p.imei_number)}</td>
+        <td>${escapeHtml(p.condition)}</td>
+        <td>${money(p.purchase_price)}</td>
+        <td>${money(p.selling_price)}</td>
+        <td><span class="badge ${statusBadge[p.stock_status] || 'badge-gray'}">${p.stock_status}</span></td>
+      </tr>
+    `).join('') : '<tr><td colspan="6">No phones found.</td></tr>';
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="6">Error loading inventory.</td></tr>`;
+  }
+}
+
+async function ensureSupplier(name) {
+  if (!name) return null;
+  const existing = await API.get(`/inventory/suppliers/?search=${encodeURIComponent(name)}`);
+  const match = (existing.results || []).find(s => s.name.toLowerCase() === name.toLowerCase());
+  if (match) return match.id;
+  const created = await API.post('/inventory/suppliers/', { name });
+  return created.id;
+}
+
+document.getElementById('phone-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  try {
+    const supplierName = document.getElementById('p-supplier_name').value.trim();
+    const supplierId = await ensureSupplier(supplierName);
+
+    await API.post('/inventory/phones/', {
+      brand: document.getElementById('p-brand').value,
+      model_name: document.getElementById('p-model').value,
+      imei_number: document.getElementById('p-imei').value,
+      condition: document.getElementById('p-condition').value,
+      purchase_price: document.getElementById('p-purchase_price').value,
+      selling_price: document.getElementById('p-selling_price').value,
+      purchase_date: document.getElementById('p-purchase_date').value,
+      supplier: supplierId,
+    });
+    e.target.reset();
+    loadPhones();
+  } catch (err) {
+    alert(formatApiError(err));
+  }
+});
+
+document.getElementById('filter-status').addEventListener('change', loadPhones);
+let searchTimer;
+document.getElementById('search-box').addEventListener('input', () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(loadPhones, 300);
+});
+
+loadPhones();
+</script>
+{% endblock %}

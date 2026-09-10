@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}{{ product }}{% endblock %}
+{% block content %}
+<div class="row g-5">
+    <div class="col-md-5">
+        {% if product.image %}
+            <img src="{{ product.image.url }}" class="img-fluid rounded shadow-sm">
+        {% else %}
+            <div class="product-img-placeholder rounded" style="height:320px;font-size:5rem;"><i class="bi bi-phone"></i></div>
+        {% endif %}
+    </div>
+    <div class="col-md-7">
+        <h2>{{ product }}</h2>
+        <p class="text-muted">{{ product.brand.name }} &bull; {{ product.category.name|default:"Smartphone" }}</p>
+        <h3 class="fw-bold text-primary">₹{{ product.price }}</h3>
+
+        <ul class="list-group list-group-flush mb-3">
+            <li class="list-group-item"><strong>RAM:</strong> {{ product.ram }}</li>
+            <li class="list-group-item"><strong>Storage:</strong> {{ product.storage }}</li>
+            {% if product.color %}<li class="list-group-item"><strong>Color:</strong> {{ product.color }}</li>{% endif %}
+            <li class="list-group-item"><strong>Availability:</strong>
+                {% if product.in_stock %}
+                    <span class="text-success">In stock ({{ product.stock_quantity }} units)</span>
+                {% else %}
+                    <span class="text-danger">Out of stock</span>
+                {% endif %}
+            </li>
+        </ul>
+
+        {% if product.description %}<p>{{ product.description }}</p>{% endif %}
+
+        <div class="emi-box p-3 mb-4">
+            <strong><i class="bi bi-cash-coin"></i> Buy on EMI</strong> &mdash; No cost upfront, choose a tenure of 3 to 24 months at checkout.
+        </div>
+
+        {% if product.in_stock %}
+            <a href="{% url 'checkout' product.id %}" class="btn btn-primary btn-lg">Buy Now / Apply for Loan</a>
+        {% else %}
+            <button class="btn btn-secondary btn-lg" disabled>Out of Stock</button>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

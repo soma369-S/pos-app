@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Customers{% endblock %}
+{% block content %}
+<h1>Customers</h1>
+
+<div class="card">
+  <h2>Add New Customer</h2>
+  <form id="customer-form">
+    <div class="form-row">
+      <div>
+        <label>Full Name</label>
+        <input type="text" id="c-full_name" required>
+      </div>
+      <div>
+        <label>Phone</label>
+        <input type="text" id="c-phone" placeholder="+919876543210" required>
+      </div>
+    </div>
+    <div class="form-row">
+      <div>
+        <label>Email (optional)</label>
+        <input type="email" id="c-email">
+      </div>
+      <div>
+        <label>ID Proof Type</label>
+        <select id="c-id_proof_type">
+          <option value="AADHAAR">Aadhaar Card</option>
+          <option value="PAN">PAN Card</option>
+          <option value="VOTER_ID">Voter ID</option>
+          <option value="PASSPORT">Passport</option>
+          <option value="DRIVING_LICENSE">Driving License</option>
+          <option value="OTHER">Other</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div>
+        <label>ID Proof Number</label>
+        <input type="text" id="c-id_proof_number" required>
+      </div>
+      <div>
+        <label>Address</label>
+        <input type="text" id="c-address">
+      </div>
+    </div>
+    <button type="submit">Add Customer</button>
+  </form>
+</div>
+
+<div class="card">
+  <div class="toolbar">
+    <h2 style="margin:0">All Customers</h2>
+    <input type="search" id="search-box" placeholder="Search name, phone, ID...">
+  </div>
+  <table>
+    <thead>
+      <tr><th>Name</th><th>Phone</th><th>ID Proof</th><th>Active Loans</th><th>Status</th><th></th></tr>
+    </thead>
+    <tbody id="customers-body"><tr><td colspan="6">Loading...</td></tr></tbody>
+  </table>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'frontend/js/api.js' %}"></script>
+<script>
+async function loadCustomers(query = '') {
+  const tbody = document.getElementById('customers-body');
+  try {
+    const data = await API.get(`/customers/?search=${encodeURIComponent(query)}`);
+    const rows = data.results || [];
+    tbody.innerHTML = rows.length ? rows.map(c => `
+      <tr>
+        <td>${escapeHtml(c.full_name)}</td>
+        <td>${escapeHtml(c.phone)}</td>
+        <td>${escapeHtml(c.id_proof_type)}: ${escapeHtml(c.id_proof_number)}</td>
+        <td>${c.active_loans_count}</td>
+        <td>${c.is_blacklisted
+            ? '<span class="badge badge-red">Blacklisted</span>'
+            : '<span class="badge badge-green">Good Standing</span>'}</td>
+        <td><button class="btn-secondary" onclick="toggleBlacklist(${c.id}, ${c.is_blacklisted})">
+              ${c.is_blacklisted ? 'Un-blacklist' : 'Blacklist'}
+            </button></td>
+      </tr>
+    `).join('') : '<tr><td colspan="6">No customers found.</td></tr>';
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="6">Error loading customers.</td></tr>`;
+  }
+}
+
+async function toggleBlacklist(id, current) {
+  try {
+    await API.patch(`/customers/${id}/`, { is_blacklisted: !current });
+    loadCustomers(document.getElementById('search-box').value);
+  } catch (err) {
+    alert(formatApiError(err));
+  }
+}
+
+document.getElementById('customer-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  try {
+    await API.post('/customers/', {
+      full_name: document.getElementById('c-full_name').value,
+      phone: document.getElementById('c-phone').value,
+      email: document.getElementById('c-email').value || null,
+      id_proof_type: document.getElementById('c-id_proof_type').value,
+      id_proof_number: document.getElementById('c-id_proof_number').value,
+      address: document.getElementById('c-address').value,
+    });
+    e.target.reset();
+    loadCustomers();
+  } catch (err) {
+    alert(formatApiError(err));
+  }
+});
+
+let searchTimer;
+document.getElementById('search-box').addEventListener('input', (e) => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => loadCustomers(e.target.value), 300);
+});
+
+loadCustomers();
+</script>
+{% endblock %}

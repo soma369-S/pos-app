@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Loans{% endblock %}
+{% block content %}
+<h1>Loans (Mobile on EMI)</h1>
+
+<div class="card">
+  <h2>Give a Phone on Loan</h2>
+  <form id="loan-form">
+    <div class="form-row">
+      <div>
+        <label>Customer</label>
+        <select id="l-customer" required></select>
+      </div>
+      <div>
+        <label>Available Phone</label>
+        <select id="l-mobile" required></select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div>
+        <label>Total Amount (auto-filled from phone price)</label>
+        <input type="number" step="0.01" id="l-total_amount" required>
+      </div>
+      <div>
+        <label>Down Payment</label>
+        <input type="number" step="0.01" id="l-down_payment" value="0">
+      </div>
+    </div>
+    <div class="form-row">
+      <div>
+        <label>Annual Interest Rate (%)</label>
+        <input type="number" step="0.01" id="l-interest_rate" value="0">
+      </div>
+      <div>
+        <label>Tenure (months)</label>
+        <input type="number" id="l-tenure_months" value="6" min="1" required>
+      </div>
+    </div>
+    <div class="form-row">
+      <div>
+        <label>Start Date</label>
+        <input type="date" id="l-start_date" required>
+      </div>
+      <div></div>
+    </div>
+    <button type="submit">Create Loan</button>
+  </form>
+</div>
+
+<div class="card">
+  <div class="toolbar">
+    <h2 style="margin:0">All Loans</h2>
+    <select id="filter-status">
+      <option value="">All statuses</option>
+      <option value="ACTIVE">Active</option>
+      <option value="CLOSED">Closed</option>
+      <option value="DEFAULTED">Defaulted</option>
+    </select>
+  </div>
+  <table>
+    <thead>
+      <tr><th>Customer</th><th>Phone</th><th>Monthly EMI</th><th>Tenure</th><th>Outstanding</th><th>Status</th><th></th></tr>
+    </thead>
+    <tbody id="loans-body"><tr><td colspan="7">Loading...</td></tr></tbody>
+  </table>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'frontend/js/api.js' %}"></script>
+<script>
+async function populateDropdowns() {
+  const [customers, phones] = await Promise.all([
+    API.get('/customers/?page_size=500'),
+    API.get('/inventory/phones/?stock_status=AVAILABLE&page_size=500'),
+  ]);
+
+  const customerSelect = document.getElementById('l-customer');
+  customerSelect.innerHTML = (customers.results || [])
+    .filter(c => !c.is_blacklisted)
+    .map(c => `<option value="${c.id}">${escapeHtml(c.full_name)} - ${escapeHtml(c.phone)}</option>`)
+    .join('') || '<option value="">No eligible customers</option>';
+
+  const mobileSelect = document.getElementById('l-mobile');
+  mobileSelect.innerHTML = (phones.results || [])
+    .map(p => `<option value="${p.id}" data-price="${p.selling_price}">${escapeHtml(p.brand)} ${escapeHtml(p.model_name)} - ${escapeHtml(p.imei_number)} (${money(p.selling_price)})</option>`)
+    .join('') || '<option value="">No phones in stock</option>';
+
+  mobileSelect.addEventListener('change', () => {
+    const opt = mobileSelect.selectedOptions[0];
+    if (opt && opt.dataset.price) {
+      document.getElementById('l-total_amount').value = opt.dataset.price;
+    }
+  });
+  mobileSelect.dispatchEvent(new Event('change'));
+}
+
+const statusBadge = { ACTIVE: 'badge-green', CLOSED: 'badge-gray', DEFAULTED: 'badge-red', CANCELLED: 'badge-yellow' };
+
+async function loadLoans() {
+  const tbody = document.getElementById('loans-body');
+  const status = document.getElementById('filter-status').value;
+  const params = status ? `?status=${status}` : '';
+  try {
+    const data = await API.get(`/loans/${params}`);
+    const rows = data.results || [];
+    tbody.innerHTML = rows.length ? rows.map(l => `
+      <tr>
+        <td>${escapeHtml(l.customer_name)}</td>
+        <td>${escapeHtml(l.mobile_display)}</td>
+        <td>${money(l.monthly_emi)}</td>
+        <td>${l.tenure_months} mo</td>
+        <td>${money(l.outstanding_balance)}</td>
+        <td><span class="badge ${statusBadge[l.status] || 'badge-gray'}">${l.status}</span></td>
+        <td><a class="btn-link" href="/loans/${l.id}/">View Schedule</a></td>
+      </tr>
+    `).join('') : '<tr><td colspan="7">No loans found.</td></tr>';
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="7">Error loading loans.</td></tr>`;
+  }
+}
+
+document.getElementById('loan-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  try {
+    await API.post('/loans/', {
+      customer: Number(document.getElementById('l-customer').value),
+      mobile: Number(document.getElementById('l-mobile').value),
+      total_amount: document.getElementById('l-total_amount').value,
+      down_payment: document.getElementById('l-down_payment').value,
+      interest_rate: document.getElementById('l-interest_rate').value,
+      tenure_months: document.getElementById('l-tenure_months').value,
+      start_date: document.getElementById('l-start_date').value,
+    });
+    e.target.reset();
+    await populateDropdowns();
+    await loadLoans();
+  } catch (err) {
+    alert(formatApiError(err));
+  }
+});
+
+document.getElementById('filter-status').addEventListener('change', loadLoans);
+
+populateDropdowns();
+loadLoans();
+</script>
+{% endblock %}

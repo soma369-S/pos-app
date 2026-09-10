@@ -1,0 +1,11 @@
+Production-style structure:
+- accounts
+- customers
+- devices
+- sales
+- installments
+- reports
+- templates
+- static
+- DRF ready
+- MySQL ready

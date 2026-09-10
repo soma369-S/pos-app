@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Login - Mobile Loan System{% endblock %}
+{% block content %}
+<div class="login-wrapper">
+  <div class="card login-card">
+    <h1>📱 Mobile Loan System</h1>
+    <form method="post">
+      {% csrf_token %}
+      <label>Username</label>
+      <input type="text" name="username" required autofocus>
+      <label>Password</label>
+      <input type="password" name="password" required>
+      <button type="submit" style="width:100%">Log In</button>
+    </form>
+    <p style="color:var(--text-muted); font-size:.8rem; margin-top:14px; text-align:center;">
+      Staff login. Ask your admin for an account, or create one with
+      <code>python manage.py createsuperuser</code>.
+    </p>
+  </div>
+</div>
+{% endblock %}

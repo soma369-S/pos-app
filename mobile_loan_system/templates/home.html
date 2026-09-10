@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Home{% endblock %}
+{% block content %}
+<div class="hero mb-5">
+    <h1 class="display-6 fw-bold">Get the phone you want today. Pay a little every month.</h1>
+    <p class="lead mb-4">Browse the latest mobiles, buy them outright or apply for an EMI loan approved in minutes.</p>
+    <a href="{% url 'product_list' %}" class="btn btn-light btn-lg fw-semibold">Shop Mobiles <i class="bi bi-arrow-right"></i></a>
+</div>
+
+<h3 class="mb-3">Featured Phones</h3>
+<div class="row g-4">
+    {% for product in featured %}
+    <div class="col-md-4">
+        <div class="card product-card h-100">
+            {% if product.image %}
+                <img src="{{ product.image.url }}" class="card-img-top" style="height:180px;object-fit:cover;">
+            {% else %}
+                <div class="product-img-placeholder"><i class="bi bi-phone"></i></div>
+            {% endif %}
+            <div class="card-body">
+                <h5 class="card-title">{{ product }}</h5>
+                <p class="text-muted mb-1">{{ product.brand.name }}</p>
+                <p class="fw-bold fs-5">₹{{ product.price }}</p>
+                <a href="{% url 'product_detail' product.id %}" class="btn btn-outline-primary w-100">View & Buy</a>
+            </div>
+        </div>
+    </div>
+    {% empty %}
+    <p class="text-muted">No products yet — add some from the Django admin.</p>
+    {% endfor %}
+</div>
+{% endblock %}

@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<h1>Dashboard</h1>
+
+<div class="grid grid-4" id="stats">
+  <div class="card stat-card"><div class="value" id="stat-customers">-</div><div class="label">Customers</div></div>
+  <div class="card stat-card"><div class="value" id="stat-phones">-</div><div class="label">Phones in Stock</div></div>
+  <div class="card stat-card"><div class="value" id="stat-active-loans">-</div><div class="label">Active Loans</div></div>
+  <div class="card stat-card"><div class="value" id="stat-outstanding">-</div><div class="label">Outstanding Amount</div></div>
+</div>
+
+<div class="card">
+  <h2>Recent Loans</h2>
+  <table>
+    <thead>
+      <tr><th>Customer</th><th>Phone</th><th>Monthly EMI</th><th>Status</th><th>Outstanding</th><th></th></tr>
+    </thead>
+    <tbody id="recent-loans-body">
+      <tr><td colspan="6">Loading...</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="grid grid-2">
+  <a class="card" style="text-decoration:none;color:inherit" href="{% url 'frontend:customers' %}">
+    <h2>👤 Manage Customers</h2>
+    <p style="color:var(--text-muted)">Add new customers, view KYC info, and blacklist defaulters.</p>
+  </a>
+  <a class="card" style="text-decoration:none;color:inherit" href="{% url 'frontend:inventory' %}">
+    <h2>📦 Manage Inventory</h2>
+    <p style="color:var(--text-muted)">Purchase new phones into stock and track IMEI-level status.</p>
+  </a>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'frontend/js/api.js' %}"></script>
+<script>
+async function loadDashboard() {
+  try {
+    const [customers, phones, loans] = await Promise.all([
+      API.get('/customers/?page_size=1'),
+      API.get('/inventory/phones/?stock_status=AVAILABLE&page_size=1'),
+      API.get('/loans/?status=ACTIVE&page_size=100'),
+    ]);
+
+    document.getElementById('stat-customers').textContent = customers.count ?? '-';
+    document.getElementById('stat-phones').textContent = phones.count ?? '-';
+    document.getElementById('stat-active-loans').textContent = loans.count ?? '-';
+
+    const outstanding = (loans.results || []).reduce((sum, l) => sum + Number(l.outstanding_balance), 0);
+    document.getElementById('stat-outstanding').textContent = money(outstanding);
+
+    const tbody = document.getElementById('recent-loans-body');
+    const rows = (loans.results || []).slice(0, 8);
+    tbody.innerHTML = rows.length ? rows.map(l => `
+      <tr>
+        <td>${escapeHtml(l.customer_name)}</td>
+        <td>${escapeHtml(l.mobile_display)}</td>
+        <td>${money(l.monthly_emi)}</td>
+        <td><span class="badge badge-green">${l.status}</span></td>
+        <td>${money(l.outstanding_balance)}</td>
+        <td><a class="btn-link" href="/loans/${l.id}/">View</a></td>
+      </tr>
+    `).join('') : '<tr><td colspan="6">No active loans yet.</td></tr>';
+  } catch (err) {
+    console.error(err);
+  }
+}
+loadDashboard();
+</script>
+{% endblock %}
